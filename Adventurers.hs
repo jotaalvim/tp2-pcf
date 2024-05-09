@@ -56,8 +56,7 @@ possible moves that the adventurers can make.  --}
 allValidPlays :: State -> ListDur State
 allValidPlays s = manyChoice $ map (validPlay s) lt 
     where
-        lt = map ( (right:) . fromPair) $ makePairs $ filterL s 
-
+        lt = map ( (right:) . fromPair ) $ makePairs $ filterL s 
 
 
 -- blackbird combinator
@@ -91,7 +90,7 @@ in < 17 min ? --}
 l17 :: Bool
 l17 = undefined
 
---------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 {-- Implementation of the monad used for the problem of the adventurers.
 Recall the Knight's quest --}
 
