@@ -9,16 +9,19 @@ data Adventurer = P1 | P2 | P5 | P10 deriving (Show,Eq)
 type Objects = Either Adventurer ()
 
 -- The time that each adventurer needs to cross the bridge
--- To implement 
 getTimeAdv :: Adventurer -> Int
-getTimeAdv = undefined
+getTimeAdv P1 = 1
+getTimeAdv P2 = 2
+getTimeAdv P5 = 5
+getTimeAdv P10 = 10
 
 {-- The state of the game, i.e. the current position of each adventurer
 + the lantern. The function (const False) represents the initial state of the
 game, with all adventurers and the lantern on the left side of the bridge.
 Similarly, the function (const True) represents the end state of the game, with
-all adventurers and the lantern on the right side of the bridge.  
+all adventurers and the lantern on the right side of the bridge.
 --}
+
 type State = Objects -> Bool
 
 instance Show State where
@@ -35,7 +38,6 @@ instance Eq State where
                     s1 (Left P10) == s2 (Left P10),
                     s1 (Right ()) == s2 (Right ())]
 
-
 -- The initial state of the game
 gInit :: State
 gInit = const False
@@ -48,12 +50,28 @@ changeState a s = let v = s a in (\x -> if x == a then not v else s x)
 mChangeState :: [Objects] -> State -> State
 mChangeState os s = foldr changeState s os
                                
-
 {-- For a given state of the game, the function presents all the
 possible moves that the adventurers can make.  --}
--- To implement
+
 allValidPlays :: State -> ListDur State
-allValidPlays = undefined
+allValidPlays s = manyChoice $ map (validPlay s) lt 
+    where
+        lt = map ( (right:) . fromPair) $ makePairs $ filterL s 
+
+
+
+-- blackbird combinator
+(...) = (.).(.)
+
+validPlay :: State -> [Objects] -> ListDur State
+validPlay = return ... flip mChangeState
+
+-- filtra o pessoal que está com a lanterna num estado
+filterL :: State -> [Objects]
+filterL s =  
+    filter ( \x -> s x == s (Right ()))
+        [ Left P1, Left P2, Left P5, Left P10]
+
 
 {-- For a given number n and initial state, the function calculates
 all possible n-sequences of moves that the adventures can make --}
@@ -103,6 +121,10 @@ manyChoice :: [ListDur a] -> ListDur a
 manyChoice = LD . concat . (map remLD)
 
 --------- List Utils ----------
+right  = Right ()
+
+fromPair (a,b) = [a,b]
+
 makePairs :: (Eq a) => [a] -> [(a,a)]
 makePairs as = normalize $ do a1 <- as; a2 <- as; [(a1,a2)]
                                 
