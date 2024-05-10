@@ -22,7 +22,8 @@ instance Monad Duration where
     return x = (Duration (0,x))
 
 waitn :: Int -> Duration a -> Duration a
-waitn n ((Duration (d,x)) = Duration (d+1,x)
+waitn n (Duration (d,x)) = Duration (d+n,x)
+
 wait1 :: Duration a -> Duration a
 wait1 (Duration (d,x)) = Duration (d+1,x)
 

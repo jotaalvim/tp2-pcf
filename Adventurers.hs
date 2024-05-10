@@ -2,6 +2,8 @@
 module Adventurers where
 
 import DurationMonad
+import Data.List
+import Control.Monad
 
 -- The list of adventurers
 data Adventurer = P1 | P2 | P5 | P10 deriving (Show,Eq)
@@ -54,29 +56,36 @@ mChangeState os s = foldr changeState s os
 possible moves that the adventurers can make.  --}
 
 allValidPlays :: State -> ListDur State
-allValidPlays s = manyChoice $ map (validPlay s) lt 
+allValidPlays s = manyChoice $ map ( validPlay s . (right:) . fromPair ) pairs
     where
-        lt = map ( (right:) . fromPair ) $ makePairs $ filterL s 
-
+        pairs = makePairs $ filterL s 
 
 -- blackbird combinator
 (...) = (.).(.)
 
+-- função que alcula mas não coloca tempo na duração
+validPlay2 :: State -> [Objects] -> ListDur State
+validPlay2  = return ... flip mChangeState
+
 validPlay :: State -> [Objects] -> ListDur State
-validPlay = return ... flip mChangeState
+validPlay s l = LD $ singleton $ wait (maxT l ) $ return $ mChangeState l s 
+
+maxT = foldr ( max . either getTimeAdv zero) 0
 
 -- filtra o pessoal que está com a lanterna num estado
 filterL :: State -> [Objects]
-filterL s =  
-    filter ( \x -> s x == s (Right ()))
-        [ Left P1, Left P2, Left P5, Left P10]
+filterL s =  filter ((== s right) . s) $ Left <$> [P1, P2, P5, P10]
 
 
 {-- For a given number n and initial state, the function calculates
 all possible n-sequences of moves that the adventures can make --}
--- To implement 
 exec :: Int -> State -> ListDur State
 exec = undefined
+--exec 0 s = allValidPlays s
+--exec n s = do
+--    moves <- allValidPlays s
+--    rest <- exec (n - 1) moves
+--    return rest
 
 {-- Is it possible for all adventurers to be on the other side
 in <=17 min and not exceeding 5 moves ? --}
@@ -119,8 +128,13 @@ instance Monad ListDur where
 manyChoice :: [ListDur a] -> ListDur a
 manyChoice = LD . concat . (map remLD)
 
---------- List Utils ----------
+--------- Utils --------------
+
+zero = const 0
+
 right  = Right ()
+
+--------- List Utils ----------
 
 fromPair (a,b) = [a,b]
 
