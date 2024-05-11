@@ -60,6 +60,19 @@ allValidPlays s = manyChoice $ map ( validPlay s . (right:) . fromPair ) pairs
     where
         pairs = makePairs $ filterL s 
 
+allValidPlays2 :: State -> ListDur State
+allValidPlays2 s = manyChoice $ muda1 ++ muda2
+    where
+    -- muda 1 pessoa
+        muda1 = map ( validPlay s . (right:) . return   ) $ filterL s
+    -- muda 2 pessoas
+        muda2 = map ( validPlay s . (right:) . fromPair ) $ makePairs $ filterL s
+
+validPlay :: State -> [Objects] -> ListDur State
+validPlay s l = LD $ return $ wait (maxT l ) $ return $ mChangeState l s 
+
+maxT = foldr ( max . either getTimeAdv zero) 0
+
 -- blackbird combinator
 (...) = (.).(.)
 
@@ -67,10 +80,6 @@ allValidPlays s = manyChoice $ map ( validPlay s . (right:) . fromPair ) pairs
 validPlay2 :: State -> [Objects] -> ListDur State
 validPlay2  = return ... flip mChangeState
 
-validPlay :: State -> [Objects] -> ListDur State
-validPlay s l = LD $ singleton $ wait (maxT l ) $ return $ mChangeState l s 
-
-maxT = foldr ( max . either getTimeAdv zero) 0
 
 -- filtra o pessoal que está com a lanterna num estado
 filterL :: State -> [Objects]
@@ -80,18 +89,20 @@ filterL s =  filter ((== s right) . s) $ Left <$> [P1, P2, P5, P10]
 {-- For a given number n and initial state, the function calculates
 all possible n-sequences of moves that the adventures can make --}
 exec :: Int -> State -> ListDur State
-exec = undefined
---exec 0 s = allValidPlays s
---exec n s = do
---    moves <- allValidPlays s
---    rest <- exec (n - 1) moves
---    return rest
+--exec = undefined
+exec 0 s = allValidPlays2 s
+exec n s = do
+    moves <- allValidPlays2 s
+    rest <- exec (n - 1) moves
+    return rest
 
+
+allT s = all s [Left P1, Left P2, Left P5, Left P10]
 {-- Is it possible for all adventurers to be on the other side
 in <=17 min and not exceeding 5 moves ? --}
 -- To implement
-leq17 :: Bool
-leq17 = undefined
+--leq17 :: Bool
+leq17 = filter (\ (Duration (a,b)) -> allT b ) $ remLD $ exec 10 gInit
 
 {-- Is it possible for all adventurers to be on the other side
 in < 17 min ? --}
