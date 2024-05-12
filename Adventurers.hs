@@ -102,7 +102,7 @@ allT s = all s [Left P1, Left P2, Left P5, Left P10]
 in <=17 min and not exceeding 5 moves ? --}
 -- To implement
 --leq17 :: Bool
-leq17 = filter (\ (Duration (a,b)) -> allT b ) $ remLD $ exec 10 gInit
+leq17 = filter (\ (Duration (a,b)) -> allT b && a <= 19 ) $ remLD $ exec 6 gInit
 
 {-- Is it possible for all adventurers to be on the other side
 in < 17 min ? --}
