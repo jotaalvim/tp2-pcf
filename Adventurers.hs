@@ -3,7 +3,6 @@ module Adventurers where
 
 import DurationMonad
 import Data.List
-import Control.Monad
 
 -- The list of adventurers
 data Adventurer = P1 | P2 | P5 | P10 deriving (Show,Eq)
@@ -15,19 +14,18 @@ getTimeAdv :: Adventurer -> Int
 getTimeAdv P1 = 1
 getTimeAdv P2 = 2
 getTimeAdv P5 = 5
-getTimeAdv P10 = 10
+getTimeAdv _  = 10
 
 {-- The state of the game, i.e. the current position of each adventurer
-+ the lantern. The function (const False) represents the initial state of the
-game, with all adventurers and the lantern on the left side of the bridge.
-Similarly, the function (const True) represents the end state of the game, with
-all adventurers and the lantern on the right side of the bridge.
---}
-
++ the lantern. The function (const False) represents the initial state
+of the game, with all adventurers and the lantern on the left side of
+the bridge. Similarly, the function (const True) represents the end
+state of the game, with all adventurers and the lantern on the right
+side of the bridge.  --}
 type State = Objects -> Bool
 
 instance Show State where
-  show s = (show . (fmap show)) [s (Left P1),
+  show s = (show . fmap show) [s (Left P1),
                                  s (Left P2),
                                  s (Left P5),
                                  s (Left P10),
@@ -40,6 +38,8 @@ instance Eq State where
                     s1 (Left P10) == s2 (Left P10),
                     s1 (Right ()) == s2 (Right ())]
 
+
+
 -- The initial state of the game
 gInit :: State
 gInit = const False
@@ -48,69 +48,102 @@ gInit = const False
 changeState :: Objects -> State -> State
 changeState a s = let v = s a in (\x -> if x == a then not v else s x)
 
--- Changes the state of the game for a list of objects 
+-- Changes the state of the game of a list of objects 
 mChangeState :: [Objects] -> State -> State
 mChangeState os s = foldr changeState s os
-                               
-{-- For a given state of the game, the function presents all the
-possible moves that the adventurers can make.  --}
 
+-------------------------------------
+-- ALLVALIDPLAYS
+
+-- gets a list of all adventurers that have the lamp and the lamp
+peopleThatHaveTheLamp :: State -> [Objects]
+peopleThatHaveTheLamp s = filter (\x -> s (Right()) == s x) [Left P1, Left P2, Left P5, Left P10, Right ()]
+
+-- takes the list of all adventures that have the lamp and make a list of all the crossings that can be made (lamp included)
+possibleCrossings :: State -> [[Objects]]
+possibleCrossings = filter (\p -> (elem (Right ()) p) && ((length p) == 2 || (length p) == 3)) . subsequences . peopleThatHaveTheLamp
+
+-- more complete getTimeAdv function that also includes the lantern
+getTimeObj :: Objects -> Int
+getTimeObj (Left a) = getTimeAdv a
+getTimeObj _ = 0
+
+-- take a crossing and returns the time of this crossing (the max of time that takes the more late person)
+getCrossingTime :: [Objects] -> Int
+getCrossingTime = foldr (max . getTimeObj) 0
+
+-- take a time and a listDur and applies wait with that time to all durations of the list
+waitList :: ListDur a -> Int ->  ListDur a
+waitList l t = LD $ (map (wait t)) (remLD l)
+
+-- for a given state of the game, the function presents all the possible moves that the adventurers can make.
 allValidPlays :: State -> ListDur State
-allValidPlays s = manyChoice $ map ( validPlay s . (right:) . fromPair ) pairs
-    where
-        pairs = makePairs $ filterL s 
-
-allValidPlays2 :: State -> ListDur State
-allValidPlays2 s = manyChoice $ muda1 ++ muda2
-    where
-    -- muda 1 pessoa
-        muda1 = map ( validPlay s . (right:) . return   ) $ filterL s
-    -- muda 2 pessoas
-        muda2 = map ( validPlay s . (right:) . fromPair ) $ makePairs $ filterL s
-
-validPlay :: State -> [Objects] -> ListDur State
-validPlay s l = LD $ return $ wait (maxT l ) $ return $ mChangeState l s 
-
-maxT = foldr ( max . either getTimeAdv zero) 0
-
--- blackbird combinator
-(...) = (.).(.)
-
--- função que alcula mas não coloca tempo na duração
-validPlay2 :: State -> [Objects] -> ListDur State
-validPlay2  = return ... flip mChangeState
-
-
--- filtra o pessoal que está com a lanterna num estado
-filterL :: State -> [Objects]
-filterL s =  filter ((== s right) . s) $ Left <$> [P1, P2, P5, P10]
-
-
+allValidPlays s = manyChoice $ map (\c -> waitList (return (mChangeState c s)) (getCrossingTime c)) (possibleCrossings s)
+   
+-------------------------------------
+-- exec
 {-- For a given number n and initial state, the function calculates
-all possible n-sequences of moves that the adventures can make --}
+all possible n-sequences of moves that the adventurers can make --}
 exec :: Int -> State -> ListDur State
---exec = undefined
-exec 0 s = allValidPlays2 s
-exec n s = do
-    moves <- allValidPlays2 s
-    rest <- exec (n - 1) moves
-    return rest
+exec 0 s = pure s
+exec n s = do s1 <- allValidPlays s
+              exec (n-1) s1
+  
+                 
+-------------------------------------
+-- questoes
 
-
-allT s = all s [Left P1, Left P2, Left P5, Left P10]
 {-- Is it possible for all adventurers to be on the other side
 in <=17 min and not exceeding 5 moves ? --}
--- To implement
---leq17 :: Bool
-leq17 = filter (\ (Duration (a,b)) -> allT b && a <= 19 ) $ remLD $ exec 6 gInit
+-- yes it can in 5 mooves and this prooves it
+leq17 :: Bool
+leq17 = any (\(Duration (t,s)) -> t <= 17 && s == const True) (remLD (exec 5 gInit))
+
 
 {-- Is it possible for all adventurers to be on the other side
 in < 17 min ? --}
--- To implement
+-- this prooves it because P10 must cross at least one time wich takes 10 minutes, 
+-- supposing now each cross then only takes 1 minute (the fastest adventurer)
+-- we only have 6 crossing lefts if we dont want to exceed 16 minutes
+-- so there cannot be more than 7 crossing and there is no need to calculate more than that
 l17 :: Bool
-l17 = undefined
+l17 = any (\(Duration (t,s)) -> t < 17 && s == const True) (remLD (exec 7 gInit))
 
--------------------------------------------------------------------------------
+
+-------------------------------------
+----------- VALORIZACAO
+
+-- FASTEST
+
+-- like allvalidplays but with historic just use the first one of the list
+allValidPlaysHist :: [State] -> ListDur [State]
+allValidPlaysHist [] = LD []
+allValidPlaysHist (s:ss) = manyChoice $ map (\c -> waitList (pure ([mChangeState c s]++[s]++ss)) (getCrossingTime c)) (possibleCrossings s)
+
+-- like exec but with historic just use the first one of the list
+execHist :: Int -> [State] -> ListDur [State]
+execHist 0 s = pure s
+execHist n s = do s1 <- allValidPlaysHist s
+                  execHist (n-1) s1
+                 
+-- show the solutions of 17 minutes
+fastest :: [[State]]
+fastest = map (reverse . getValue) fastestAux
+fastestAux :: [(Duration [State])]
+fastestAux = filter (\(Duration (t,(s:ss))) -> t <= 17 && s == const True) (remLD (execHist 5 [gInit]))
+
+
+-- SOLUTIONS
+
+-- show the number of solutions that have less than x crossings
+solutionsC :: Int -> Int
+solutionsC x = length (filter (\(Duration (t,s)) -> s == const True) (remLD (exec x gInit)))
+
+-- show the number of solutions that have less than x crossings and less than y minutes
+solutionsCT :: Int -> Int -> Int
+solutionsCT x y = length (filter (\(Duration (t,s)) -> t <= y && s == const True) (remLD (exec x gInit)))
+    
+-------------------------------------
 {-- Implementation of the monad used for the problem of the adventurers.
 Recall the Knight's quest --}
 
@@ -120,42 +153,22 @@ remLD :: ListDur a -> [Duration a]
 remLD (LD x) = x
 
 instance Functor ListDur where
-   fmap f = let f' = (fmap f) in
-     LD . (map f') . remLD
+   fmap f = LD . map (fmap f) . remLD
 
 instance Applicative ListDur where
-   pure x = LD [Duration (0,x)]
+   pure x = LD [ Duration(0,x) ]
    l1 <*> l2 = LD $ do x <- remLD l1
                        y <- remLD l2
-                       return $ do f <- x; a <- y; return (f a)
+                       return $ x <*> y
+
 
 instance Monad ListDur where
    return = pure
    l >>= k = LD $ do x <- remLD l
                      g x where
-                       g(Duration (i,x)) = let u = (remLD (k x))
-                          in map (\(Duration (i',x)) -> Duration (i + i', x)) u
+                        g (Duration (d, a)) = let u = remLD (k a) in
+                           map (\(Duration (d', a)) -> Duration (d + d', a)) u
+
 
 manyChoice :: [ListDur a] -> ListDur a
-manyChoice = LD . concat . (map remLD)
-
---------- Utils --------------
-
-zero = const 0
-
-right  = Right ()
-
---------- List Utils ----------
-
-fromPair (a,b) = [a,b]
-
-makePairs :: (Eq a) => [a] -> [(a,a)]
-makePairs as = normalize $ do a1 <- as; a2 <- as; [(a1,a2)]
-                                
-normalize :: (Eq a) => [(a,a)] -> [(a,a)]
-normalize l = removeSw $ filter p1 l where
-  p1 (x,y) = if x /= y then True else False
-
-removeSw :: (Eq a) => [(a,a)] -> [(a,a)]
-removeSw [] = []
-removeSw ((a,b):xs) = if elem (b,a) xs then removeSw xs else (a,b):(removeSw xs)
+manyChoice = LD . concatMap remLD

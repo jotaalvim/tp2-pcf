@@ -19,10 +19,7 @@ instance Applicative Duration where
   
 instance Monad Duration where
     (Duration (i,x)) >>= k = Duration (i + (getDuration (k x)), getValue (k x))
-    return x = (Duration (0,x))
-
-waitn :: Int -> Duration a -> Duration a
-waitn n (Duration (d,x)) = Duration (d+n,x)
+    return = pure
 
 wait1 :: Duration a -> Duration a
 wait1 (Duration (d,x)) = Duration (d+1,x)
