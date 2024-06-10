@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Adventurers where
 
+import Control.Monad
 import DurationMonad
 import Data.List
 
@@ -22,6 +23,7 @@ of the game, with all adventurers and the lantern on the left side of
 the bridge. Similarly, the function (const True) represents the end
 state of the game, with all adventurers and the lantern on the right
 side of the bridge.  --}
+
 type State = Objects -> Bool
 
 instance Show State where
@@ -29,14 +31,14 @@ instance Show State where
                                  s (Left P2),
                                  s (Left P5),
                                  s (Left P10),
-                                 s (Right ())]
+                                 s (right)]
 
 instance Eq State where
   (==) s1 s2 = and [s1 (Left P1) == s2 (Left P1),
                     s1 (Left P2) == s2 (Left P2),
                     s1 (Left P5) == s2 (Left P5),
                     s1 (Left P10) == s2 (Left P10),
-                    s1 (Right ()) == s2 (Right ())]
+                    s1 (right) == s2 (right)]
 
 
 
@@ -52,16 +54,27 @@ changeState a s = let v = s a in (\x -> if x == a then not v else s x)
 mChangeState :: [Objects] -> State -> State
 mChangeState os s = foldr changeState s os
 
--------------------------------------
--- ALLVALIDPLAYS
+-------------------------------------------------------------------------------
+right = Right()
+
+-- https://blog.lahteenmaki.net/combinator-birds.html
+-- ψ = x y z w = x (y z) (y w)
+psi = join . ((flip . ((.) .)) .) . (.)
+-- Φ x y z w = x (y w) (z w)
+phoenix = (ap .) . (.)
+
 
 -- gets a list of all adventurers that have the lamp and the lamp
+
+-- ALLVALIDPLAYS
 peopleThatHaveTheLamp :: State -> [Objects]
-peopleThatHaveTheLamp s = filter (\x -> s (Right()) == s x) [Left P1, Left P2, Left P5, Left P10, Right ()]
+peopleThatHaveTheLamp s = (right :) $ filter ((== s right) . s) $ Left <$> [P1, P2, P5, P10] 
+-- peopleThatHaveTheLamp s = filter (\x -> s (Right ()) == s x) [Left P1, Left P2, Left P5, Left P10, Right()]
 
 -- takes the list of all adventures that have the lamp and make a list of all the crossings that can be made (lamp included)
 possibleCrossings :: State -> [[Objects]]
-possibleCrossings = filter (\p -> (elem (Right ()) p) && ((length p) == 2 || (length p) == 3)) . subsequences . peopleThatHaveTheLamp
+possibleCrossings = filter (\p -> (elem right p) && psi (||) (length p ==) 2 3) . subsequences . peopleThatHaveTheLamp
+--possibleCrossings = filter (\p -> (elem right p) && ((length p) == 2 || (length p) == 3)) . subsequences . peopleThatHaveTheLamp
 
 -- more complete getTimeAdv function that also includes the lantern
 getTimeObj :: Objects -> Int
@@ -74,13 +87,14 @@ getCrossingTime = foldr (max . getTimeObj) 0
 
 -- take a time and a listDur and applies wait with that time to all durations of the list
 waitList :: ListDur a -> Int ->  ListDur a
-waitList l t = LD $ (map (wait t)) (remLD l)
+waitList l t = LD $ map (wait t) (remLD l)
+--waitList = LD $ phoenix map wait  remLD
+-- Φ x y z w = x (y w) (z w)
 
 -- for a given state of the game, the function presents all the possible moves that the adventurers can make.
 allValidPlays :: State -> ListDur State
 allValidPlays s = manyChoice $ map (\c -> waitList (return (mChangeState c s)) (getCrossingTime c)) (possibleCrossings s)
    
--------------------------------------
 -- exec
 {-- For a given number n and initial state, the function calculates
 all possible n-sequences of moves that the adventurers can make --}
@@ -89,9 +103,7 @@ exec 0 s = pure s
 exec n s = do s1 <- allValidPlays s
               exec (n-1) s1
   
-                 
--------------------------------------
--- questoes
+--------  Questoes   ----------------------------------------------------------
 
 {-- Is it possible for all adventurers to be on the other side
 in <=17 min and not exceeding 5 moves ? --}
@@ -109,9 +121,7 @@ in < 17 min ? --}
 l17 :: Bool
 l17 = any (\(Duration (t,s)) -> t < 17 && s == const True) (remLD (exec 7 gInit))
 
-
--------------------------------------
------------ VALORIZACAO
+-------- Valorização ----------------------------------------------------------
 
 -- FASTEST
 
@@ -142,10 +152,12 @@ solutionsC x = length (filter (\(Duration (t,s)) -> s == const True) (remLD (exe
 -- show the number of solutions that have less than x crossings and less than y minutes
 solutionsCT :: Int -> Int -> Int
 solutionsCT x y = length (filter (\(Duration (t,s)) -> t <= y && s == const True) (remLD (exec x gInit)))
-    
--------------------------------------
-{-- Implementation of the monad used for the problem of the adventurers.
-Recall the Knight's quest --}
+   
+
+
+-------------------------------------------------------------------------------
+-- Implementation of the monad used for the problem of the adventurers.
+-- Recall the Knight's quest 
 
 data ListDur a = LD [Duration a] deriving Show
 
