@@ -87,8 +87,10 @@ getCrossingTime = foldr (max . getTimeObj) 0
 
 -- take a time and a listDur and applies wait with that time to all durations of the list
 waitList :: ListDur a -> Int ->  ListDur a
-waitList l t = LD $ map (wait t) (remLD l)
---waitList = LD $ phoenix map wait  remLD
+waitList = c LD map wait remLD
+--waitList l t = LD $ map (wait t) (remLD l)
+
+c k f g h l t = k $ f (g t) (h l) 
 -- Φ x y z w = x (y w) (z w)
 
 -- for a given state of the game, the function presents all the possible moves that the adventurers can make.
